@@ -27,11 +27,11 @@ TRACK_START_X = 150
 TRACK_CENTER_Y = 0
 TRACK_LENGTH = 1800
 
-RAIL_GAUGE = 105           # расстояние между центрами двух рельсов
-RAIL_THICKNESS = 20        # высота отрисовки текстуры рельса
+RAIL_GAUGE = 95           # расстояние между центрами двух рельсов
+RAIL_THICKNESS = 15        # высота отрисовки текстуры рельса
 SLEEPER_SPACING = 105      # расстояние между шпалами
 SLEEPER_LENGTH = 175       # длина шпалы поперёк пути
-SLEEPER_THICKNESS = 25     # толщина шпалы при отрисовке
+SLEEPER_THICKNESS = 35     # толщина шпалы при отрисовке
 SLEEPER_START_OFFSET = 25  # сдвиг первой шпалы от начала рельсов
 
 # Камера.
