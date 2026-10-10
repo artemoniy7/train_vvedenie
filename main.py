@@ -302,7 +302,7 @@ def main() -> None:
         )
         draw_sleepers(
             screen, branch_centerline, camera_x, camera_y, zoom, sleeper_texture,
-            skip_start_distance=250.0,
+            skip_start_distance=600.0,
         )
         draw_rail_path(screen, main_centerline, camera_x, camera_y, zoom, rail_texture)
         draw_rail_path(screen, branch_centerline, camera_x, camera_y, zoom, rail_texture)
