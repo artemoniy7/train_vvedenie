@@ -199,10 +199,9 @@ def draw_sleepers(
     camera_y: float,
     zoom: float,
     sleeper_texture: pygame.Surface | None,
-    junctions: list[tuple[float, float]] | None = None,
-    junction_clearance: float = 155.0,
+    skip_start_distance: float = 0.0,
 ) -> None:
-    """Ставит шпалы поперёк пути, оставляя свободную зону вокруг стрелочного узла."""
+    """Ставит шпалы поперёк пути; при необходимости пропускает начало ветки."""
     if len(centerline) < 2:
         return
     cumulative = [0.0]
@@ -225,13 +224,9 @@ def draw_sleepers(
         y = y1 + (y2 - y1) * t
         angle = a1 + (a2 - a1) * t
 
-        # Внутри узла стрелки шпалы обеих линий убираются: это предотвращает
-        # наложение текстур в месте расхождения путей. Ближайшие шпалы остаются
-        # за пределами зоны и сохраняют обычный шаг вдоль своей линии.
-        if junctions and any(
-            math.hypot(x - jx, y - jy) < junction_clearance
-            for jx, jy in junctions
-        ):
+        # Пропускаем только первые шпалы ответвления, которые накладывались
+        # на шпалы основной линии. Основной путь при этом остаётся непрерывным.
+        if target < skip_start_distance:
             target += SLEEPER_SPACING
             continue
 
@@ -300,16 +295,14 @@ def main() -> None:
 
         screen.fill(BACKGROUND_COLOR)
 
-        # Оставляем свободную зону вокруг точки ответвления, чтобы шпалы
-        # основной линии и ветки не накладывались друг на друга.
-        turnout_zone = [(float(BRANCH_START_X), float(TRACK_CENTER_Y))]
+        # На основной линии сохраняем все шпалы. Убираем только первые шпалы
+        # ответвления, которые накладываются на шпалы главного пути.
         draw_sleepers(
             screen, main_centerline, camera_x, camera_y, zoom, sleeper_texture,
-            junctions=turnout_zone,
         )
         draw_sleepers(
             screen, branch_centerline, camera_x, camera_y, zoom, sleeper_texture,
-            junctions=turnout_zone,
+            skip_start_distance=250.0,
         )
         draw_rail_path(screen, main_centerline, camera_x, camera_y, zoom, rail_texture)
         draw_rail_path(screen, branch_centerline, camera_x, camera_y, zoom, rail_texture)
