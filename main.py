@@ -52,6 +52,9 @@ SLEEPER_COLOR = (105, 82, 58)
 RAIL_COLOR = (145, 151, 155)
 RAIL_DARK_COLOR = (65, 69, 72)
 
+# Кэш готовых спрайтов шпал: поворот и масштаб выполняются только один раз.
+SLEEPER_SPRITE_CACHE: dict[tuple[int, int, int], pygame.Surface] = {}
+
 
 def load_texture(filename: str) -> pygame.Surface | None:
     """Ищет текстуру в стандартных местах проекта."""
@@ -150,57 +153,36 @@ def draw_rail_path(
     zoom: float,
     rail_texture: pygame.Surface | None,
 ) -> None:
-    """Рисует два рельса: цельной текстурой на прямых и короткими фрагментами на дугах."""
+    """Быстро рисует рельсы линиями: без масштабирования/поворота текстур каждый кадр."""
     if len(points) < 2:
         return
     gauge_half = RAIL_GAUGE / 2
     thickness = max(2, round(RAIL_THICKNESS * zoom))
+    clip = screen.get_rect()
 
-    # На полностью прямом участке используем один длинный элемент текстуры
-    # на каждый рельс — больше никаких повторяющихся коротких сегментов.
-    straight = all(
-        abs(points[i][2] - points[0][2]) < 1e-5
-        for i in range(1, len(points))
-    )
     for side in (-1, 1):
         centers = []
         for x, y, angle in points:
             nx, ny = -math.sin(angle), math.cos(angle)
-            centers.append(world_to_screen(
-                x + side * gauge_half * nx, y + side * gauge_half * ny,
-                camera_x, camera_y, zoom
-            ))
+            sx, sy = world_to_screen(
+                x + side * gauge_half * nx,
+                y + side * gauge_half * ny,
+                camera_x, camera_y, zoom,
+            )
+            centers.append((sx, sy))
 
-        if rail_texture is None:
-            pygame.draw.lines(screen, RAIL_DARK_COLOR, False, centers, thickness + 2)
-            pygame.draw.lines(screen, RAIL_COLOR, False, centers, thickness)
+        # Отсекаем линии, которые целиком вне экрана, прежде чем рисовать.
+        xs = [p[0] for p in centers]
+        ys = [p[1] for p in centers]
+        margin = thickness + 4
+        if (max(xs) < -margin or min(xs) > SCREEN_WIDTH + margin
+                or max(ys) < -margin or min(ys) > SCREEN_HEIGHT + margin):
             continue
 
-        if straight:
-            p1, p2 = centers[0], centers[-1]
-            length = max(2, round(math.hypot(p2[0] - p1[0], p2[1] - p1[1])))
-            source = rail_texture
-            # Вся длина исходной текстуры используется на прямом рельсе.
-            tile = pygame.transform.smoothscale(source, (length, thickness))
-            angle = math.degrees(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
-            tile = pygame.transform.rotate(tile, -angle)
-            screen.blit(tile, tile.get_rect(center=((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)))
-            continue
-
-        # На кривой каждый небольшой фрагмент ориентируется по своей касательной.
-        tile_src_w = min(90, rail_texture.get_width())
-        tile_src = rail_texture.subsurface((0, 0, tile_src_w, rail_texture.get_height()))
-        for i in range(len(points) - 1):
-            x1, y1, a1 = points[i]
-            x2, y2, a2 = points[i + 1]
-            mid_angle = (a1 + a2) / 2
-            nx, ny = -math.sin(mid_angle), math.cos(mid_angle)
-            p1 = world_to_screen(x1 + side * gauge_half * nx, y1 + side * gauge_half * ny, camera_x, camera_y, zoom)
-            p2 = world_to_screen(x2 + side * gauge_half * nx, y2 + side * gauge_half * ny, camera_x, camera_y, zoom)
-            segment_len = max(2, round(math.hypot(p2[0] - p1[0], p2[1] - p1[1]) + 3))
-            tile = pygame.transform.smoothscale(tile_src, (segment_len, thickness))
-            tile = pygame.transform.rotate(tile, -math.degrees(mid_angle))
-            screen.blit(tile, tile.get_rect(center=((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)))
+        # Pygame рисует полилинии значительно дешевле, чем преобразование
+        # тысяч текстурных кусочков каждый кадр. Двойной штрих сохраняет объём.
+        pygame.draw.lines(screen, RAIL_DARK_COLOR, False, centers, thickness + 2)
+        pygame.draw.lines(screen, RAIL_COLOR, False, centers, thickness)
 
 
 def draw_sleepers(
@@ -242,18 +224,30 @@ def draw_sleepers(
             continue
 
         sx, sy = world_to_screen(x, y, camera_x, camera_y, zoom)
+        # Не тратим время на шпалы, которые далеко за пределами окна.
+        if (sx < -SCREEN_WIDTH or sx > SCREEN_WIDTH * 2
+                or sy < -SCREEN_HEIGHT or sy > SCREEN_HEIGHT * 2):
+            target += SLEEPER_SPACING
+            continue
+
         width = max(1, round(SLEEPER_THICKNESS * zoom))
         height = max(1, round(SLEEPER_LENGTH * zoom))
-        if sleeper_texture is not None:
-            sleeper = pygame.transform.smoothscale(sleeper_texture, (width, height))
-            sleeper = pygame.transform.rotate(sleeper, -math.degrees(angle))
-            rect = sleeper.get_rect(center=(sx, sy))
-            screen.blit(sleeper, rect)
-        else:
-            sleeper = pygame.Surface((width, height), pygame.SRCALPHA)
-            sleeper.fill(SLEEPER_COLOR)
-            sleeper = pygame.transform.rotate(sleeper, -math.degrees(angle))
-            screen.blit(sleeper, sleeper.get_rect(center=(sx, sy)))
+        angle_key = round(math.degrees(angle) / 3) * 3
+        cache_key = (width, height, angle_key)
+        sleeper = SLEEPER_SPRITE_CACHE.get(cache_key)
+        if sleeper is None:
+            if sleeper_texture is not None:
+                base = pygame.transform.scale(sleeper_texture, (width, height))
+            else:
+                base = pygame.Surface((width, height), pygame.SRCALPHA)
+                base.fill(SLEEPER_COLOR)
+            sleeper = pygame.transform.rotate(base, -angle_key)
+            # Ограничиваем размер кэша, чтобы при прокрутке масштаба
+            # не накапливались бесконечные варианты спрайтов.
+            if len(SLEEPER_SPRITE_CACHE) > 700:
+                SLEEPER_SPRITE_CACHE.clear()
+            SLEEPER_SPRITE_CACHE[cache_key] = sleeper
+        screen.blit(sleeper, sleeper.get_rect(center=(sx, sy)))
         target += SLEEPER_SPACING
 
 
