@@ -8,7 +8,7 @@ Railway Simulator — прямой участок пути и плавная с�
 """
 
 import math
-from pathlib import Path
+import random
 
 import pygame
 
@@ -48,29 +48,14 @@ MIN_ZOOM = 0.25
 MAX_ZOOM = 3.0
 START_ZOOM = 0.8
 
-SLEEPER_COLOR = (105, 82, 58)
-RAIL_COLOR = (145, 151, 155)
-RAIL_DARK_COLOR = (65, 69, 72)
+SLEEPER_COLOR = (112, 83, 55)
+SLEEPER_DARK_COLOR = (70, 51, 35)
+RAIL_COLOR = (155, 160, 164)
+RAIL_DARK_COLOR = (62, 66, 70)
+RAIL_HIGHLIGHT_COLOR = (205, 209, 211)
 
 # Кэш готовых спрайтов шпал: поворот и масштаб выполняются только один раз.
 SLEEPER_SPRITE_CACHE: dict[tuple[int, int, int], pygame.Surface] = {}
-
-
-def load_texture(filename: str) -> pygame.Surface | None:
-    """Ищет текстуру в стандартных местах проекта."""
-    candidates = (
-        Path("assets") / "textures" / filename,
-        Path("assets") / filename,
-        Path(filename),
-    )
-    for path in candidates:
-        if path.is_file():
-            try:
-                return pygame.image.load(str(path)).convert_alpha()
-            except (pygame.error, OSError) as error:
-                print(f"Не удалось загрузить текстуру {path}: {error}")
-    print(f"Текстура {filename} не найдена — используется простая заглушка.")
-    return None
 
 
 def world_to_screen(
@@ -151,7 +136,7 @@ def draw_rail_path(
     camera_x: float,
     camera_y: float,
     zoom: float,
-    rail_texture: pygame.Surface | None,
+    rail_texture: pygame.Surface | None = None,
 ) -> None:
     """Быстро рисует рельсы линиями: без масштабирования/поворота текстур каждый кадр."""
     if len(points) < 2:
@@ -181,8 +166,11 @@ def draw_rail_path(
 
         # Pygame рисует полилинии значительно дешевле, чем преобразование
         # тысяч текстурных кусочков каждый кадр. Двойной штрих сохраняет объём.
-        pygame.draw.lines(screen, RAIL_DARK_COLOR, False, centers, thickness + 2)
-        pygame.draw.lines(screen, RAIL_COLOR, False, centers, thickness)
+        # Тёмная боковая грань, светлая верхняя поверхность и тонкий блик.
+        pygame.draw.lines(screen, RAIL_DARK_COLOR, False, centers, thickness + 3)
+        pygame.draw.lines(screen, RAIL_COLOR, False, centers, max(1, thickness - 2))
+        if thickness >= 5:
+            pygame.draw.lines(screen, RAIL_HIGHLIGHT_COLOR, False, centers, 1)
 
 
 def draw_sleepers(
@@ -191,7 +179,7 @@ def draw_sleepers(
     camera_x: float,
     camera_y: float,
     zoom: float,
-    sleeper_texture: pygame.Surface | None,
+    sleeper_texture: pygame.Surface | None = None,
     skip_start_distance: float = 0.0,
 ) -> None:
     """Ставит шпалы поперёк пути; при необходимости пропускает начало ветки."""
@@ -236,11 +224,24 @@ def draw_sleepers(
         cache_key = (width, height, angle_key)
         sleeper = SLEEPER_SPRITE_CACHE.get(cache_key)
         if sleeper is None:
-            if sleeper_texture is not None:
-                base = pygame.transform.scale(sleeper_texture, (width, height))
-            else:
-                base = pygame.Surface((width, height), pygame.SRCALPHA)
-                base.fill(SLEEPER_COLOR)
+            # Процедурная деревянная шпала с небольшим зерном и тёмными волокнами.
+            base = pygame.Surface((width, height), pygame.SRCALPHA)
+            base.fill(SLEEPER_COLOR)
+            rng = random.Random((width * 73856093) ^ (height * 19349663))
+            if width >= 3 and height >= 8:
+                for _ in range(max(3, height // 5)):
+                    gx = rng.randrange(width)
+                    gy = rng.randrange(height)
+                    grain_len = rng.randrange(2, max(3, min(15, height // 3)))
+                    pygame.draw.line(
+                        base, SLEEPER_DARK_COLOR, (gx, gy),
+                        (gx + rng.choice((-1, 0, 1)), min(height - 1, gy + grain_len)),
+                        1,
+                    )
+                for _ in range(max(2, height // 18)):
+                    gx = rng.randrange(width)
+                    gy = rng.randrange(height)
+                    base.set_at((gx, gy), SLEEPER_DARK_COLOR)
             sleeper = pygame.transform.rotate(base, -angle_key)
             # Ограничиваем размер кэша, чтобы при прокрутке масштаба
             # не накапливались бесконечные варианты спрайтов.
@@ -259,8 +260,9 @@ def main() -> None:
     font = pygame.font.Font(None, 25)
     small_font = pygame.font.Font(None, 21)
 
-    rail_texture = load_texture("ral.png")
-    sleeper_texture = load_texture("sleeper.png")
+    # Рельсы и шпалы теперь рисуются процедурно — внешние текстуры не нужны.
+    rail_texture = None
+    sleeper_texture = None
 
     camera_x = TRACK_START_X + TRACK_LENGTH / 2
     camera_y = TRACK_CENTER_Y
