@@ -102,16 +102,10 @@ def main() -> None:
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
             elif event.type == pygame.MOUSEWHEEL:
-                old_zoom = zoom
                 if event.y > 0:
                     zoom = min(MAX_ZOOM, zoom * (ZOOM_STEP ** event.y))
                 elif event.y < 0:
                     zoom = max(MIN_ZOOM, zoom / (ZOOM_STEP ** (-event.y)))
-
-                # Сохраняем точку мира под центром окна при масштабировании.
-                if old_zoom != zoom:
-                    camera_x += SCREEN_WIDTH / 2 * (1 / old_zoom - 1 / zoom)
-                    camera_y += SCREEN_HEIGHT / 2 * (1 / old_zoom - 1 / zoom)
 
         keys = pygame.key.get_pressed()
         move_x = int(keys[pygame.K_d] or keys[pygame.K_RIGHT]) - int(
