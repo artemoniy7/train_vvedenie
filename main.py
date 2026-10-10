@@ -84,9 +84,7 @@ def main() -> None:
     rail_texture = load_texture("ral.png")
     sleeper_texture = load_texture("sleeper.png")
 
-    # Поворот исходной вертикальной шпалы в горизонтальное положение.
-    if sleeper_texture is not None:
-        sleeper_texture = pygame.transform.rotate(sleeper_texture, 90)
+    # Текстура sleeper.png уже вертикальная — оставляем её без поворота.
 
     camera_x = TRACK_START_X + TRACK_LENGTH / 2
     camera_y = TRACK_CENTER_Y
@@ -124,8 +122,9 @@ def main() -> None:
         screen.fill(BACKGROUND_COLOR)
 
         # Шпалы рисуются первыми, чтобы рельсы были поверх них.
-        sleeper_world_width = SLEEPER_LENGTH
-        sleeper_world_height = SLEEPER_THICKNESS
+        # Рельсы идут горизонтально, поэтому шпалы должны быть вертикальными.
+        sleeper_world_width = SLEEPER_THICKNESS
+        sleeper_world_height = SLEEPER_LENGTH
         sleeper_count = int(TRACK_LENGTH / SLEEPER_SPACING) + 2
         for index in range(sleeper_count):
             x = TRACK_START_X + SLEEPER_START_OFFSET + index * SLEEPER_SPACING
