@@ -150,25 +150,44 @@ def draw_rail_path(
     zoom: float,
     rail_texture: pygame.Surface | None,
 ) -> None:
-    """Рисует пару рельсов со смещением по нормали к локальной касательной."""
+    """Рисует два рельса: цельной текстурой на прямых и короткими фрагментами на дугах."""
+    if len(points) < 2:
+        return
     gauge_half = RAIL_GAUGE / 2
     thickness = max(2, round(RAIL_THICKNESS * zoom))
+
+    # На полностью прямом участке используем один длинный элемент текстуры
+    # на каждый рельс — больше никаких повторяющихся коротких сегментов.
+    straight = all(
+        abs(points[i][2] - points[0][2]) < 1e-5
+        for i in range(1, len(points))
+    )
     for side in (-1, 1):
         centers = []
         for x, y, angle in points:
-            # Нормаль к направлению движения: (-sin(a), cos(a)).
             nx, ny = -math.sin(angle), math.cos(angle)
-            rx = x + side * gauge_half * nx
-            ry = y + side * gauge_half * ny
-            centers.append(world_to_screen(rx, ry, camera_x, camera_y, zoom))
+            centers.append(world_to_screen(
+                x + side * gauge_half * nx, y + side * gauge_half * ny,
+                camera_x, camera_y, zoom
+            ))
 
-        if rail_texture is None or len(points) < 2:
+        if rail_texture is None:
             pygame.draw.lines(screen, RAIL_DARK_COLOR, False, centers, thickness + 2)
             pygame.draw.lines(screen, RAIL_COLOR, False, centers, thickness)
             continue
 
-        # Короткие перекрывающиеся фрагменты текстуры не дают дуге выглядеть
-        # ломаной и позволяют каждому фрагменту следовать своей касательной.
+        if straight:
+            p1, p2 = centers[0], centers[-1]
+            length = max(2, round(math.hypot(p2[0] - p1[0], p2[1] - p1[1])))
+            source = rail_texture
+            # Вся длина исходной текстуры используется на прямом рельсе.
+            tile = pygame.transform.smoothscale(source, (length, thickness))
+            angle = math.degrees(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
+            tile = pygame.transform.rotate(tile, -angle)
+            screen.blit(tile, tile.get_rect(center=((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)))
+            continue
+
+        # На кривой каждый небольшой фрагмент ориентируется по своей касательной.
         tile_src_w = min(90, rail_texture.get_width())
         tile_src = rail_texture.subsurface((0, 0, tile_src_w, rail_texture.get_height()))
         for i in range(len(points) - 1):
@@ -176,20 +195,12 @@ def draw_rail_path(
             x2, y2, a2 = points[i + 1]
             mid_angle = (a1 + a2) / 2
             nx, ny = -math.sin(mid_angle), math.cos(mid_angle)
-            x1 += side * gauge_half * nx
-            y1 += side * gauge_half * ny
-            x2 += side * gauge_half * nx
-            y2 += side * gauge_half * ny
-            p1 = world_to_screen(x1, y1, camera_x, camera_y, zoom)
-            p2 = world_to_screen(x2, y2, camera_x, camera_y, zoom)
+            p1 = world_to_screen(x1 + side * gauge_half * nx, y1 + side * gauge_half * ny, camera_x, camera_y, zoom)
+            p2 = world_to_screen(x2 + side * gauge_half * nx, y2 + side * gauge_half * ny, camera_x, camera_y, zoom)
             segment_len = max(2, round(math.hypot(p2[0] - p1[0], p2[1] - p1[1]) + 3))
-            segment_h = max(2, thickness)
-            tile = pygame.transform.smoothscale(tile_src, (segment_len, segment_h))
-            # Pygame вращает против часовой стрелки, что соответствует углу
-            # касательной при экранной системе координат.
+            tile = pygame.transform.smoothscale(tile_src, (segment_len, thickness))
             tile = pygame.transform.rotate(tile, -math.degrees(mid_angle))
-            tile_rect = tile.get_rect(center=((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2))
-            screen.blit(tile, tile_rect)
+            screen.blit(tile, tile.get_rect(center=((p1[0] + p2[0]) // 2, (p1[1] + p2[1]) // 2)))
 
 
 def draw_sleepers(
@@ -262,14 +273,58 @@ def main() -> None:
     zoom = START_ZOOM
     running = True
 
-    # Основная линия и ветка задаются одной геометрией для шпал и рельсов.
-    _, branch_points = make_track_points()
-    branch_points = sample_branch()
-    main_centerline = [
-        (float(TRACK_START_X), float(TRACK_CENTER_Y), 0.0),
-        (float(TRACK_START_X + TRACK_LENGTH), float(TRACK_CENTER_Y), 0.0),
-    ]
-    branch_centerline = branch_points
+    # Схема полигона: несколько параллельных путей и плавные отводы.
+    # Каждая линия хранит точки центра и угол касательной.
+    track_lines: list[list[tuple[float, float, float]]] = []
+    track_sleepers: list[tuple[list[tuple[float, float, float]], float]] = []
+
+    POLYGON_TRACK_COUNT = 5
+    POLYGON_TRACK_SPACING = 320
+    POLYGON_TRACK_LENGTH = 5200
+    POLYGON_START_X = -400
+    POLYGON_BRANCH_RADIUS = 900
+    POLYGON_BRANCH_ANGLE = 24
+    POLYGON_BRANCH_LENGTH = 1350
+    POLYGON_BRANCH_STARTS = [900, 1850, 2850, 3900]
+
+    for lane in range(POLYGON_TRACK_COUNT):
+        lane_y = (lane - (POLYGON_TRACK_COUNT - 1) / 2) * POLYGON_TRACK_SPACING
+        straight_line = [
+            (float(POLYGON_START_X), float(lane_y), 0.0),
+            (float(POLYGON_START_X + POLYGON_TRACK_LENGTH), float(lane_y), 0.0),
+        ]
+        track_lines.append(straight_line)
+        track_sleepers.append((straight_line, 0.0))
+
+        # На нескольких линиях добавляем ответвления с разными направлениями.
+        if lane in (0, 1, 3, 4):
+            side = -1 if lane < 2 else 1
+            start_x = POLYGON_BRANCH_STARTS[lane if lane < 2 else lane - 1]
+            angle_max = math.radians(POLYGON_BRANCH_ANGLE)
+            radius = float(POLYGON_BRANCH_RADIUS)
+            arc_len = radius * angle_max
+            arc_count = max(3, math.ceil(arc_len / CURVE_SAMPLE_STEP))
+            branch: list[tuple[float, float, float]] = []
+            for i in range(arc_count + 1):
+                a = angle_max * i / arc_count
+                branch.append((
+                    start_x + radius * math.sin(a),
+                    lane_y + side * radius * (1.0 - math.cos(a)),
+                    side * a,
+                ))
+            ex, ey, ea = branch[-1]
+            straight_count = max(2, math.ceil(POLYGON_BRANCH_LENGTH / CURVE_SAMPLE_STEP))
+            for i in range(1, straight_count + 1):
+                d = POLYGON_BRANCH_LENGTH * i / straight_count
+                branch.append((ex + d * math.cos(ea), ey + d * math.sin(ea), ea))
+            track_lines.append(branch)
+            # Сохраняем настройку пропуска шпал только у изначальной стрелки.
+            track_sleepers.append((branch, 600.0 if lane == 2 else 0.0))
+
+    camera_x = 2100.0
+    camera_y = 0.0
+    zoom = START_ZOOM
+    running = True
 
     while running:
         dt = min(clock.tick(FPS) / 1000.0, 0.05)
@@ -295,24 +350,21 @@ def main() -> None:
 
         screen.fill(BACKGROUND_COLOR)
 
-        # На основной линии сохраняем все шпалы. Убираем только первые шпалы
-        # ответвления, которые накладываются на шпалы главного пути.
-        draw_sleepers(
-            screen, main_centerline, camera_x, camera_y, zoom, sleeper_texture,
-        )
-        draw_sleepers(
-            screen, branch_centerline, camera_x, camera_y, zoom, sleeper_texture,
-            skip_start_distance=600.0,
-        )
-        draw_rail_path(screen, main_centerline, camera_x, camera_y, zoom, rail_texture)
-        draw_rail_path(screen, branch_centerline, camera_x, camera_y, zoom, rail_texture)
+        # Рисуем все шпалы, затем все рельсы — так текстуры рельсов остаются сверху.
+        for centerline, skip_distance in track_sleepers:
+            draw_sleepers(
+                screen, centerline, camera_x, camera_y, zoom, sleeper_texture,
+                skip_start_distance=skip_distance,
+            )
+        for centerline in track_lines:
+            draw_rail_path(screen, centerline, camera_x, camera_y, zoom, rail_texture)
 
-        title = font.render("Railway Simulator — путь с плавной развилкой", True, (240, 243, 238))
+        title = font.render("Railway Simulator — железнодорожный полигон", True, (240, 243, 238))
         screen.blit(title, (18, 16))
         hint = small_font.render("WASD / стрелки: камера   Колёсико: масштаб   Esc: выход", True, (230, 235, 228))
         screen.blit(hint, (18, 46))
         status = small_font.render(
-            f"Zoom: {zoom:.2f}x | Радиус развилки: {BRANCH_RADIUS} | Угол: {BRANCH_ANGLE_DEG}°",
+            f"Zoom: {zoom:.2f}x | Путей: {len(track_lines)} | Радиус дуг: {POLYGON_BRANCH_RADIUS}",
             True, (230, 235, 228)
         )
         screen.blit(status, (18, 72))
