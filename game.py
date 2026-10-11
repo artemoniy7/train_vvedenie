@@ -8,6 +8,7 @@ from settings import (
     BACKGROUND_COLOR,
     BOARD_COLOR,
     BOARD_HEIGHT,
+    BOARD_WIDTH,
     BOARD_LEFT,
     BOARD_PIXEL_HEIGHT,
     BOARD_PIXEL_WIDTH,
