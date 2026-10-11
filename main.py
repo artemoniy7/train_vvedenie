@@ -7,8 +7,6 @@ Railway Simulator — прямой участок пути и плавная с�
     Esc — выход
 """
 
-import math
-
 import pygame
 
 from settings import (
@@ -34,11 +32,6 @@ def main() -> None:
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 25)
     small_font = pygame.font.Font(None, 21)
-
-    camera_x = TRACK_START_X + TRACK_LENGTH / 2
-    camera_y = TRACK_CENTER_Y
-    zoom = START_ZOOM
-    running = True
 
     track_lines, track_sleepers = create_tracks()
 
