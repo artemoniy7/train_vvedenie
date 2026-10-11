@@ -1,20 +1,29 @@
-# Simple Tetris (Pygame)
+# Простой тетрис на Pygame
 
-## Run
-Install Python 3.10+, then run:
+## Как запустить игру
+
+1. Установите Python версии 3.10 или новее.
+2. Откройте терминал в папке проекта.
+3. Установите необходимые библиотеки командой:
 
 ```bash
 python -m pip install -r requirements.txt
+```
+
+4. Запустите игру командой:
+
+```bash
 python main.py
 ```
 
-## Controls
-- **Z** — move the piece left
-- **X** — move the piece right
-- **A** — rotate left
-- **D** — rotate right
-- **S** — drop the piece straight to its landing spot
-- **R** — restart after game over
-- **Esc** — quit
+## Управление
 
-The next piece is shown to the right of the board.
+- **Z** — переместить фигуру влево.
+- **X** — переместить фигуру вправо.
+- **A** — повернуть фигуру против часовой стрелки.
+- **D** — повернуть фигуру по часовой стрелке.
+- **S** — мгновенно опустить фигуру до места приземления.
+- **R** — начать заново после завершения игры.
+- **Esc** — выйти из игры.
+
+Следующая фигура отображается справа от игрового поля. За каждую удалённую линию начисляется 100 очков.
