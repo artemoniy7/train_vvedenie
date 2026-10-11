@@ -50,7 +50,11 @@ class Game:
         return True
 
     def handle_key(self, key):
-        if key == pygame.K_a:
+        if key == pygame.K_z:
+            self.try_move(-1, 0)
+        elif key == pygame.K_x:
+            self.try_move(1, 0)
+        elif key == pygame.K_a:
             self.rotate_piece(clockwise=False)
         elif key == pygame.K_d:
             self.rotate_piece(clockwise=True)
@@ -152,14 +156,18 @@ class Game:
                     pygame.draw.rect(self.screen, self.next_piece.color,
                                      rect.inflate(-2, -2), border_radius=3)
 
+        self.screen.blit(self.small_font.render("Z: move left", True, TEXT_COLOR),
+                         (info_x, 275))
+        self.screen.blit(self.small_font.render("X: move right", True, TEXT_COLOR),
+                         (info_x, 305))
         self.screen.blit(self.small_font.render("A: rotate left", True, TEXT_COLOR),
-                         (info_x, 290))
+                         (info_x, 335))
         self.screen.blit(self.small_font.render("D: rotate right", True, TEXT_COLOR),
-                         (info_x, 320))
+                         (info_x, 365))
         self.screen.blit(self.small_font.render("S: drop", True, TEXT_COLOR),
-                         (info_x, 350))
+                         (info_x, 395))
         self.screen.blit(self.small_font.render("ESC: quit", True, TEXT_COLOR),
-                         (info_x, 380))
+                         (info_x, 425))
 
         if self.game_over:
             message = self.font.render("GAME OVER", True, GAME_OVER_COLOR)
