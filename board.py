@@ -1,43 +1,43 @@
-"""Board storage, collision checks, locking pieces, and clearing lines."""
+"""Хранение поля, проверка столкновений, фиксация фигур и очистка линий."""  # Назначение этого модуля.
 
-from settings import BOARD_WIDTH, BOARD_HEIGHT
+from settings import BOARD_WIDTH, BOARD_HEIGHT  # Импортируем размеры поля из настроек.
 
 
-class Board:
-    def __init__(self):
-        self.reset()
+class Board:  # Класс отвечает за состояние игрового поля.
+    def __init__(self):  # Вызывается при создании поля.
+        self.reset()  # Создаём пустое поле.
 
-    def reset(self):
-        self.cells = [
-            [None for _ in range(BOARD_WIDTH)]
-            for _ in range(BOARD_HEIGHT)
+    def reset(self):  # Очищает поле, подготавливая новую игру.
+        self.cells = [  # Сохраняем поле как список строк.
+            [None for _ in range(BOARD_WIDTH)]  # Каждая строка содержит пустые клетки; None означает, что клетка свободна.
+            for _ in range(BOARD_HEIGHT)  # Создаём нужное количество строк по высоте поля.
         ]
 
-    def is_valid(self, piece):
-        """Check that every block is inside the board and in an empty cell."""
-        for x, y in piece.cells():
-            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
-                return False
-            if y >= 0 and self.cells[y][x] is not None:
-                return False
-        return True
+    def is_valid(self, piece):  # Проверяет, может ли фигура находиться в текущем положении.
+        """Проверяет, что клетки фигуры не выходят за границы и не заняты."""  # Описание проверки.
+        for x, y in piece.cells():  # Проверяем координаты каждой занятой клетки фигуры.
+            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:  # Если фигура вышла за левую, правую или нижнюю границу...
+                return False  # ...такое положение недопустимо.
+            if y >= 0 and self.cells[y][x] is not None:  # Если клетка уже на поле и занята другой фигурой...
+                return False  # ...фигуры столкнулись, поэтому положение недопустимо.
+        return True  # Все клетки прошли проверку — положение допустимо.
 
-    def lock_piece(self, piece):
-        """Add a landed piece to the board."""
-        for x, y in piece.cells():
-            if y >= 0:
-                self.cells[y][x] = piece.color
+    def lock_piece(self, piece):  # Закрепляет фигуру на поле после приземления.
+        """Добавляет приземлившуюся фигуру на игровое поле."""  # Описание фиксации фигуры.
+        for x, y in piece.cells():  # Перебираем все клетки фигуры.
+            if y >= 0:  # Записываем только клетки, которые находятся внутри верхней границы поля.
+                self.cells[y][x] = piece.color  # Сохраняем цвет фигуры в соответствующей клетке.
 
-    def clear_full_lines(self):
-        """Remove completed rows and return how many were removed."""
-        remaining = [
-            row for row in self.cells
-            if any(cell is None for cell in row)
+    def clear_full_lines(self):  # Удаляет заполненные строки и возвращает их количество.
+        """Удаляет заполненные строки и сообщает, сколько строк удалено."""  # Описание очистки линий.
+        remaining = [  # Формируем список строк, которые нужно оставить.
+            row for row in self.cells  # Проверяем каждую строку поля...
+            if any(cell is None for cell in row)  # ...и оставляем её, если в ней есть хотя бы одна пустая клетка.
         ]
-        cleared = BOARD_HEIGHT - len(remaining)
+        cleared = BOARD_HEIGHT - len(remaining)  # Считаем, сколько полностью заполненных строк убрали.
 
-        while len(remaining) < BOARD_HEIGHT:
-            remaining.insert(0, [None for _ in range(BOARD_WIDTH)])
-
-        self.cells = remaining
-        return cleared
+        while len(remaining) < BOARD_HEIGHT:  # Пока строк меньше, чем должно быть на поле...
+            remaining.insert(0, [None for _ in range(BOARD_WIDTH)])  # ...добавляем пустую строку сверху.
+        
+        self.cells = remaining  # Сохраняем поле без заполненных линий.
+        return cleared  # Возвращаем количество удалённых линий для начисления очков.
