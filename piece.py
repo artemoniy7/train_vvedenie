@@ -1,31 +1,31 @@
-"""A falling Tetris piece."""
+"""Описание падающей фигуры тетриса."""  # В этом файле описывается одна фигура.
 
-import random
+import random  # Нужен для случайного выбора фигуры.
 
-from settings import SHAPES, PIECE_COLORS
+from settings import SHAPES, PIECE_COLORS  # Импортируем формы фигур и соответствующие им цвета.
 
 
-class Piece:
-    """Stores a shape, its color, and its position on the board."""
+class Piece:  # Класс хранит форму, цвет и положение фигуры.
+    """Хранит форму фигуры, её цвет и координаты на поле."""  # Краткое описание класса.
 
-    def __init__(self, index=None):
-        if index is None:
-            index = random.randrange(len(SHAPES))
-        self.shape = [row[:] for row in SHAPES[index]]
-        self.color = PIECE_COLORS[index]
-        self.x = 3
-        self.y = 0
+    def __init__(self, index=None):  # Вызывается при создании новой фигуры; index можно задать вручную.
+        if index is None:  # Если номер фигуры не передали...
+            index = random.randrange(len(SHAPES))  # ...выбираем случайный номер из доступных фигур.
+        self.shape = [row[:] for row in SHAPES[index]]  # Копируем матрицу, чтобы не менять исходный шаблон.
+        self.color = PIECE_COLORS[index]  # Выбираем цвет, соответствующий форме фигуры.
+        self.x = 3  # Начальная координата фигуры по горизонтали в клетках.
+        self.y = 0  # Начальная координата фигуры по вертикали в клетках.
 
-    def rotate(self, clockwise=True):
-        """Rotate the matrix 90 degrees."""
-        if clockwise:
-            self.shape = [list(row) for row in zip(*self.shape[::-1])]
-        else:
-            self.shape = [list(row) for row in zip(*self.shape)][::-1]
+    def rotate(self, clockwise=True):  # Поворачивает фигуру на 90 градусов в выбранную сторону.
+        """Поворачивает матрицу фигуры на 90 градусов."""  # Описание метода поворота.
+        if clockwise:  # Если нужен поворот по часовой стрелке...
+            self.shape = [list(row) for row in zip(*self.shape[::-1])]  # Переставляем строки и столбцы для поворота вправо.
+        else:  # Иначе выполняем поворот против часовой стрелки...
+            self.shape = [list(row) for row in zip(*self.shape)][::-1]  # Транспонируем матрицу и переворачиваем строки.
 
-    def cells(self):
-        """Return occupied cells as board coordinates."""
-        for row_index, row in enumerate(self.shape):
-            for column_index, value in enumerate(row):
-                if value:
-                    yield self.x + column_index, self.y + row_index
+    def cells(self):  # Перечисляет координаты всех занятых клеток фигуры.
+        """Возвращает координаты занятых клеток на игровом поле."""  # Описание генератора координат.
+        for row_index, row in enumerate(self.shape):  # Перебираем строки матрицы и получаем номер каждой строки.
+            for column_index, value in enumerate(row):  # Перебираем клетки строки и получаем номер каждого столбца.
+                if value:  # Если в матрице стоит 1, клетка занята фигурой.
+                    yield self.x + column_index, self.y + row_index  # Возвращаем координату клетки с учётом положения фигуры.
