@@ -9,6 +9,8 @@ python main.py
 ```
 
 ## Controls
+- **Z** — move the piece left
+- **X** — move the piece right
 - **A** — rotate left
 - **D** — rotate right
 - **S** — drop the piece straight to its landing spot
